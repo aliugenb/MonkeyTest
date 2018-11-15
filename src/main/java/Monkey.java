@@ -1,4 +1,6 @@
 import java.io.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -14,7 +16,7 @@ public class Monkey {
     private File classpathRoot;
     private File logDir;
     private File xmlDir;
-    public static final String packageName = "com.ximalaya.ting.android.live";
+    public static final String packageName = "com.ximalaya.ting.android";
 
 
     public Monkey() {
@@ -30,23 +32,46 @@ public class Monkey {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        new Monkey().startMonkey();
+        Monkey monkey = new Monkey();
+        monkey.startMonkey();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        Thread.sleep(60000);
+                        if (!monkey.checkInLive()) {
+                            System.out.println("不在直播内");
+                            monkey.killMonkey();
+                            Thread.sleep(3000);
+                            monkey.startMonkey();
+                        }
+                        System.out.println("继续执行");
+                    } catch (InterruptedException | IOException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+            }
+        }).start();
+
 //        new Timer(new TimerTask(new ),1);
     }
 
 
     public void startMonkey() throws IOException, InterruptedException {
-        File log = new File(logDir, "MonkeyLog.txt");
+        String path;
+        Date now = new Date();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+        path = "MonkeyLog-" + dateFormat.format(now) + ".txt";
+        File log = new File(logDir, path);
         System.out.println(log);
-        String[] cmd = new String[]{"sh", "-c", "adb shell monkey -v -v -v -p com.ximalaya.ting.android 200000 --throttle 3000 > " + log};
+//        String launchCmd = "adb shell am start -n com.ximalaya.ting.android/.host.activity.WelComeActivity";
+//        String live = "adb shell input tap 677 36";
+        String[] cmd = new String[]{"sh", "-c", "adb shell monkey -v -v -v -p com.ximalaya.ting.android 20000000 --pct-touch 20 --pct-motion 20 --throttle 3000 > " + log};
         try {
             Runtime runtime = Runtime.getRuntime();
-            Process proc = runtime.exec(cmd);
-//            new ProcessClearStream(proc.getInputStream(), "INFO").start();
-//            new ProcessClearStream(proc.getErrorStream(), "ERROR").start();
-//            if (proc.waitFor() != 0) {
-//                System.err.println("exit value = " + proc.exitValue());
-//            }
+            runtime.exec(cmd);
             System.out.println("success");
         } catch (Exception e) {
             e.printStackTrace();
@@ -56,6 +81,7 @@ public class Monkey {
     public void killMonkey() {
         String getPidCmd = "adb shell ps |grep monkey";
         String killPidCmd = "adb shell kill -9";
+        String killApp = "adb shell am force-stop com.ximalaya.ting.android";
         String pid = null;
         try {
             Runtime runtime = Runtime.getRuntime();
@@ -81,6 +107,7 @@ public class Monkey {
             } else {
                 System.out.println("无进程");
             }
+            runtime.exec(killApp);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -114,8 +141,9 @@ public class Monkey {
                 System.out.println(pullXmlCmd);
                 if (proc.waitFor() != 0) {
                     System.err.println("exit value = " + proc.exitValue());
+                    System.out.println("未导出xml文件");
                 } else {
-                    System.out.println("进程关闭");
+                    System.out.println("导出成功");
                 }
             } else {
                 System.out.println("无进程");
@@ -126,6 +154,7 @@ public class Monkey {
             HashSet<String> valueSets = new XmlParser().iterateWholeXML(xml);
             for (String value : valueSets) {
                 if (value.indexOf(packageName) != -1) {
+                    System.out.println("仍在喜马拉雅App");
                     return true;
                 }
             }
